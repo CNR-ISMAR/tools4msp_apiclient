@@ -268,9 +268,6 @@ class GeoDataBuilder(object):
     def transform(self, name, vect=True):
         unzipdir = os.path.join(self.downloaded, '{}'.format(name))
         unzipdir_reprojected = os.path.join(self.downloaded, '{}_reprojected'.format(name))
-        rfpath = glob.glob("{}/*.tif".format(unzipdir))[0]
-        # rfpath = '{}/{}.tif'.format(unzipdir, name)
-        rfpath_reprojected = '{}/{}.tif'.format(unzipdir_reprojected, name)
 
         if vect:
             options = ['/usr/bin/ogr2ogr',
@@ -280,6 +277,9 @@ class GeoDataBuilder(object):
                        unzipdir
                        ]
         else:
+            rfpath = glob.glob("{}/*.tif".format(unzipdir))[0]
+            # rfpath = '{}/{}.tif'.format(unzipdir, name)
+            rfpath_reprojected = '{}/{}.tif'.format(unzipdir_reprojected, name)
             if not os.path.exists(unzipdir_reprojected):
                 os.makedirs(unzipdir_reprojected)
             options = ['/usr/bin/gdalwarp',

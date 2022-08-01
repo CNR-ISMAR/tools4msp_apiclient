@@ -16,6 +16,7 @@ import subprocess
 import cartopy.io.img_tiles as cimgt
 from urllib.parse import urljoin
 from rasterio.enums import MergeAlg
+import glob
 
 logger = logging.getLogger('tools4msp_apiclient')
 
@@ -267,7 +268,8 @@ class GeoDataBuilder(object):
     def transform(self, name, vect=True):
         unzipdir = os.path.join(self.downloaded, '{}'.format(name))
         unzipdir_reprojected = os.path.join(self.downloaded, '{}_reprojected'.format(name))
-        rfpath = '{}/{}.tif'.format(unzipdir, name)
+        rfpath = glob.glob("{}/*.tif".format(unzipdir))[0]
+        # rfpath = '{}/{}.tif'.format(unzipdir, name)
         rfpath_reprojected = '{}/{}.tif'.format(unzipdir_reprojected, name)
 
         if vect:

@@ -256,10 +256,10 @@ class GeoDataBuilder(object):
         zpath = os.path.join(self.downloaded, '{}.zip'.format(name))
         unzipdir = os.path.join(self.downloaded, '{}'.format(name))
 
-        if not os.path.isfile(zpath):
-            logger.debug("Downloading {}".format(name))
-            self.source.download_layer(name, zpath)
         if not os.path.isdir(unzipdir):
+            if not os.path.isfile(zpath):
+                logger.debug("Downloading {}".format(name))
+                self.source.download_layer(name, zpath)
             with zipfile.ZipFile(zpath, 'r') as zip_ref:
                 logger.debug("Extracting {}".format(name))
                 zip_ref.extractall(unzipdir)
@@ -290,32 +290,46 @@ class GeoDataBuilder(object):
         subprocess.check_call(options, stderr=subprocess.STDOUT)
 
     def get_remote(self, name, resolution, grid=None, column=None, query=None,
-                   transform='scale', fillvalue=0, merge_alg=MergeAlg.replace):
+                   transform='scale', fillvalue=0, merge_alg=MergeAlg.replace,
+                   store_type=None):
         unzipdir = os.path.join(self.downloaded, '{}'.format(name))
         unzipdir_reprojected = os.path.join(self.downloaded, '{}_reprojected'.format(name))
 
-        vfpath = '{}'.format(unzipdir_reprojected)
-        rfpath = '{}/{}.tif'.format(unzipdir_reprojected, name)
         self.download_remote(name)
-        l = self.source.get_layer(name)
-        self.transform(name, vect=l['store_type'] == 'dataStore')
+        if store_type is None:
+            l = self.source.get_layer(name)
+            store_type = l['store_type']
 
+        if store_type == 'dataStore':
+            fpath = '{}'.format(unzipdir_reprojected)
+        elif store_type == 'converageStore':
+            fpath = '{}/{}.tif'.format(unzipdir_reprojected, name)
+        else:
+            raise Exception("Unrecognized data store {}".format(store_type))
+
+        self.transform(name, vect=store_type == 'dataStore')
+
+        return self.rasterize_file(fpath, store_type, resolution, grid, column, query, fillvalue,
+                             merge_alg)
+
+    def rasterize_file(self, fpath, store_type, resolution, grid=None, column=None, query=None,
+                 fillvalue=0., merge_alg=MergeAlg.replace):
         if grid is None:
-            raster = rg.read_vector(vfpath, res=resolution, 
+            raster = rg.read_vector(fpath, res=resolution,
                                     rounded_bounds=True, epsg=3035, 
                                     query=query, fillvalue=np.nan)
             # raster = np.ma.masked_where(raster==0, raster)
             # raster.fill_underlying_data(raster.fill_value)
-        elif l['store_type'] == 'dataStore':
-            raster = rg.read_vector(vfpath, res=resolution, rounded_bounds=True,
+        elif store_type == 'dataStore':
+            raster = rg.read_vector(fpath, res=resolution, rounded_bounds=True,
                                     grid=grid,
                                     column=column, epsg=3035, query=query,
                                     fillvalue=fillvalue,
                                     merge_alg=merge_alg)
             raster = raster.where(raster > 0, 0).where(~grid.isnull()).rio.write_nodata(np.nan)
             # raster.mask = grid.mask.copy()
-        elif l['store_type'] == 'coverageStore':
-            raster = rg.read_raster(rfpath, grid=grid)
+        elif store_type == 'coverageStore':
+            raster = rg.read_raster(fpath, grid=grid)
             raster = raster.where(raster>0, 0).where(~grid.isnull()).rio.write_nodata(np.nan)
             # raster = raster.to_srs_like(grid)
             # TODO

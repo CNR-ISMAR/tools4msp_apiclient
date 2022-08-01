@@ -302,7 +302,7 @@ class GeoDataBuilder(object):
 
         if store_type == 'dataStore':
             fpath = '{}'.format(unzipdir_reprojected)
-        elif store_type == 'converageStore':
+        elif store_type == 'coverageStore':
             fpath = '{}/{}.tif'.format(unzipdir_reprojected, name)
         else:
             raise Exception("Unrecognized data store {}".format(store_type))

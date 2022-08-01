@@ -28,5 +28,6 @@ setup(
                       'coreapi',
                       'numpy',
                       'xarray',
+                      'beautifulsoup4'
                       ],
 )

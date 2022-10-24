@@ -58,11 +58,12 @@ class Tools4MSPApiCLient(object):
     def coded_labels(self):
         if self._coded_labels is None:
             coded_labels = self.client.action(self.schema, ['api', 'codedlabels', 'list'])
-            coded_labels_list = {}
-            for i in coded_labels:
-                coded_labels_list[i['code']] = i['url']
-            self._coded_labels = coded_labels_list
-        return self._coded_labels
+            self._coded_labels = {i['code']: i for i in coded_labels}
+        return {k: i['url'] for k, i in self._coded_labels.items()}
+
+    def get_coded_label(self, code):
+        self.coded_labels
+        return self._coded_labels.get(code, None)
 
     def get_run(self, runid):
         params = {'id': runid}
@@ -293,7 +294,7 @@ class GeoDataBuilder(object):
 
     def get_remote(self, name, resolution, grid=None, column=None, query=None,
                    transform='scale', fillvalue=0, merge_alg=MergeAlg.replace,
-                   store_type=None):
+                   store_type=None, path_only=False):
         unzipdir = os.path.join(self.downloaded, '{}'.format(name))
         unzipdir_reprojected = os.path.join(self.downloaded, '{}_reprojected'.format(name))
 
@@ -311,6 +312,8 @@ class GeoDataBuilder(object):
 
         self.transform(name, vect=store_type == 'dataStore')
 
+        if path_only:
+            return fpath
         return self.rasterize_file(fpath, store_type, resolution, grid, column, query, fillvalue,
                              merge_alg)
 
@@ -343,8 +346,10 @@ class GeoDataBuilder(object):
 
     def upload_layer(self, parent_ids, raster, code, logcolor=False,
                      legend=False, zoomlevel=9, alpha=None, figsize=None,
-                     stamen=True):
+                     stamen=True, dry_run=True): #ATTENZIONE: e' stato aggiunto perché di default non sincronizzi
         #
+        if dry_run:
+            return raster
         rpath = os.path.join(self.inputs, '{}.geotiff'.format(code))
         thumbrpath = os.path.join(self.inputs, '{}.png'.format(code))
 

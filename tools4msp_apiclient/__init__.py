@@ -321,7 +321,7 @@ class GeoDataBuilder(object):
                  fillvalue=0., merge_alg=MergeAlg.replace):
         if grid is None:
             raster = rg.read_vector(fpath, res=resolution,
-                                    rounded_bounds=True, epsg=3035, 
+                                    rounded_bounds=True, epsg=3035,
                                     query=query, fillvalue=np.nan)
             # raster = np.ma.masked_where(raster==0, raster)
             # raster.fill_underlying_data(raster.fill_value)
@@ -346,7 +346,7 @@ class GeoDataBuilder(object):
 
     def upload_layer(self, parent_ids, raster, code, logcolor=False,
                      legend=False, zoomlevel=9, alpha=None, figsize=None,
-                     stamen=True, dry_run=True): #ATTENZIONE: e' stato aggiunto perché di default non sincronizzi
+                     stamen=True, dry_run=False):
         #
         if dry_run:
             return raster

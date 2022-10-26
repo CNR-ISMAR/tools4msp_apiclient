@@ -150,7 +150,8 @@ class GeoNode(object):
         self.password = password
         self._layers = None
         self.client = None
-        self.login()
+        if login:
+            self.login()
 
     def login(self):
         client = requests.session()

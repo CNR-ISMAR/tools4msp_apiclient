@@ -143,7 +143,7 @@ class Tools4MSPApiCLient(object):
                     print(r.status_code, r.content)
 
 class GeoNode(object):
-    def __init__(self, url, username, password):
+    def __init__(self, url, username, password, login=True):
         self.url = url
         self.login_url = os.path.join(self.url, 'account', 'login/')
         self.username = username

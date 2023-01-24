@@ -37,7 +37,7 @@ class Tools4MSPApiCLient(object):
     @property
     def domain_areas(self):
         if self._domain_areas is None:
-            domain_areas = self.client.action(self.schema, ['api', 'domainareas', 'list'])
+            domain_areas = self.client.action(self.schema, ['domainareas', 'list'])
             domain_areas_list = {}
             for i in domain_areas:
                 domain_areas_list[i['label']] = i['url']
@@ -57,7 +57,7 @@ class Tools4MSPApiCLient(object):
     @property
     def coded_labels(self):
         if self._coded_labels is None:
-            coded_labels = self.client.action(self.schema, ['api', 'codedlabels', 'list'])
+            coded_labels = self.client.action(self.schema, ['codedlabels', 'list'])
             self._coded_labels = {i['code']: i for i in coded_labels}
         return {k: i['url'] for k, i in self._coded_labels.items()}
 
@@ -67,13 +67,13 @@ class Tools4MSPApiCLient(object):
 
     def get_run(self, runid):
         params = {'id': runid}
-        run =  self.client.action(self.schema, ['api', 'casestudyruns', 'read'],
+        run =  self.client.action(self.schema, ['casestudyruns', 'read'],
                        params=params)
         return run
 
     def get_cs(self, csid):
         params = {'id': csid}
-        cs =  self.client.action(self.schema, ['api', 'casestudies', 'read'],
+        cs =  self.client.action(self.schema, ['casestudies', 'read'],
                        params=params)
         return cs
 
@@ -104,7 +104,7 @@ class Tools4MSPApiCLient(object):
             'parent_lookup_casestudy__id': parent_id,
         }
         olist = self.client.action(self.schema,
-                              ['api', 'casestudies', otype, 'list'],
+                              ['casestudies', otype, 'list'],
                               params=params)
 
         created_obj = None
@@ -118,7 +118,7 @@ class Tools4MSPApiCLient(object):
         }
 
         if not replace or created_obj is None:
-            created_obj = self.client.action(self.schema, ['api', 'casestudies', otype, 'create'], params=params)
+            created_obj = self.client.action(self.schema, ['casestudies', otype, 'create'], params=params)
 
         # upload file
         if filepath is not None:
@@ -364,7 +364,7 @@ class GeoDataBuilder(object):
         plt.show()
         # upload grid
         clurl = None
-        coded_labels = self.tclient.client.action(self.tclient.schema, ['api', 'codedlabels', 'list'])
+        coded_labels = self.tclient.client.action(self.tclient.schema, ['codedlabels', 'list'])
         coded_labels_list = {}
         for i in coded_labels:
             coded_labels_list[i['code']] = i['url']
@@ -409,7 +409,7 @@ def flat_upload(name, code, grid=None):
     raster.plotmap()
     plt.savefig(thumbrpath)
     # upload grid
-    clurl = client.action(schema, ['api', 'codedlabels', 'read'],
+    clurl = client.action(schema, ['codedlabels', 'read'],
                           params={'code': code})['url']
     create_and_upload('layers', parent_id, clurl, rpath, thumbrpath)
     return raster

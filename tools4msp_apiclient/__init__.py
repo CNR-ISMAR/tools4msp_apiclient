@@ -17,8 +17,34 @@ import cartopy.io.img_tiles as cimgt
 from urllib.parse import urljoin
 from rasterio.enums import MergeAlg
 import glob
+from owslib.wps import WebProcessingService
 
 logger = logging.getLogger('tools4msp_apiclient')
+
+
+def wps_dowload(ogc_server, layer_name, filepath, username=None, password=None, public_ows=None, max_iteration=100):
+    wps = WebProcessingService(ogc_server, skip_caps=True, username=username, password=password)
+    inputs = [("layerName", layer_name), ('outputFormat', 'application/zip')]
+    output = "result"
+    processid = 'gs:Download'
+    execution = wps.execute(processid, inputs, output=[("result", True, None)])
+    if public_ows is not None:
+        execution.statusLocation = execution.statusLocation.replace(public_ows, ogc_server)
+    for i in range(0, max_iteration):
+        execution.checkStatus(sleepSecs=3)
+        if execution.isComplete():
+            break
+    if execution.isSucceeded():
+        if public_ows is not None:
+            reference = execution.processOutputs[0].reference
+            reference = reference.replace(public_ows, ogc_server)
+            execution.processOutputs[0].reference = reference
+        execution.getOutput(filepath=filepath)
+        return True
+    else:
+        for ex in execution.errors:
+            print('Error: code=%s, locator=%s, text=%s' % (ex.code, ex.locator, ex.text))
+        return False
 
 
 class Tools4MSPApiCLient(object):
@@ -28,11 +54,18 @@ class Tools4MSPApiCLient(object):
             token=TOKEN
         )
         self.client = coreapi.Client(auth=auth)
-        self.schema = self.client.get(APIURL)
+        self._schema = None
         self._coded_labels = None
         self._domain_areas = None
         self.APIURL = APIURL
         self.TOKEN = TOKEN
+
+    @property
+    def schema(self):
+        if not self._schema is not None:
+            self._schema = self.client.get(self.APIURL)
+        return self._schema
+
 
     @property
     def domain_areas(self):
@@ -77,19 +110,25 @@ class Tools4MSPApiCLient(object):
                        params=params)
         return cs
 
-    def get_output(self, runid, code):
+    def get_output(self, runid, code, thumbnail=False):
         run = self.get_run(runid)
         coded_label = self.coded_labels.get(code)
         for o in run['outputs']:
             if o['coded_label'] == coded_label:
-                return o
+                if thumbnail:
+                    return o['thumbnail']
+                else:
+                    return o['file']
 
-    def get_outputlayer(self, runid, code):
+    def get_outputlayer(self, runid, code, thumbnail=False):
         run = self.get_run(runid)
         coded_label = self.coded_labels.get(code)
         for o in run['outputlayers']:
             if o['coded_label'] == coded_label:
-                return rg.read_raster(o['file'])
+                if thumbnail:
+                    return o['thumbnail']
+                else:
+                    return rg.read_raster(o['file'])
 
     def get_layer(self, csid, code):
         cs = self.get_cs(csid)
@@ -143,11 +182,16 @@ class Tools4MSPApiCLient(object):
                     print(r.status_code, r.content)
 
 class GeoNode(object):
-    def __init__(self, url, username, password, login=True):
+    def __init__(self, url, username, password, gsusername, gspassword, login=True):
         self.url = url
         self.login_url = os.path.join(self.url, 'account', 'login/')
         self.username = username
         self.password = password
+        self.gsusername = gsusername
+        self.gspassword = gspassword
+
+        self.ogc_server = os.path.join(self.url, 'geoserver', 'ows')
+
         self._layers = None
         self.client = None
         if login:
@@ -199,7 +243,7 @@ class GeoNode(object):
                 return l
         return None
 
-    def download_layer(self, name, fpath):
+    def _download_layer(self, name, fpath):
         l = self.get_layer(name)
         durl = os.path.join(self.url, 'download', str(l['id']))
         print(durl)
@@ -212,6 +256,15 @@ class GeoNode(object):
                 shutil.copyfileobj(r.raw, f)
         else:
             print("Download error")
+
+
+    def download_layer(self, layer_name, fpath):
+        l = self.get_layer(layer_name)
+        if l is not None:
+            typename = l.get('typename')
+            print("Downloading", typename)
+            wps_dowload(self.ogc_server, typename, fpath, self.gsusername, self.gspassword, self.ogc_server)
+        print(f"Layer {layer_name} not found")
 
     def md_extra(self, id, fields=None):
         l = self.get_layer_by_id(id)
@@ -246,13 +299,24 @@ class GeoDataBuilder(object):
     api = None
     source = None
 
-    def __init__(self, APIURL, TOKEN, workdir="/tmp/", username=None, password=None):
+    def __init__(self, APIURL, TOKEN, gnurl, workdir="/tmp/", username=None, password=None, source=None, gsusername=None,
+                 gspassword=None):
         self.tclient = Tools4MSPApiCLient(APIURL, TOKEN)
         self.workdir = workdir
         self.downloaded = os.path.join(self.workdir, 'downloaded')
         self.inputs = os.path.join(self.workdir, 'inputs')
-        self.source = GeoNode('https://www.portodimare.eu/',
-                    username=username, password=password)
+        self.gnurl = gnurl
+        self.username = username
+        self.password = password
+        self.gsusername = username
+        self.gspassword = gspassword
+        if source is None:
+            self.source = GeoNode(gnurl,
+                                  username=username, password=password,
+                                  gsusername=gsusername, gspassword=gspassword
+                                  )
+        else:
+            self.source = source
 
 
     def download_remote(self, name):
@@ -270,28 +334,28 @@ class GeoDataBuilder(object):
     def transform(self, name, vect=True):
         unzipdir = os.path.join(self.downloaded, '{}'.format(name))
         unzipdir_reprojected = os.path.join(self.downloaded, '{}_reprojected'.format(name))
+        if not os.path.isdir(unzipdir_reprojected):
+            if vect:
+                options = ['/usr/bin/ogr2ogr',
+                           '-overwrite',
+                           '-t_srs', 'epsg:3035',
+                           unzipdir_reprojected,
+                           unzipdir
+                           ]
+            else:
+                rfpath = glob.glob("{}/*.tif".format(unzipdir))[0]
+                # rfpath = '{}/{}.tif'.format(unzipdir, name)
+                rfpath_reprojected = '{}/{}.tif'.format(unzipdir_reprojected, name)
+                if not os.path.exists(unzipdir_reprojected):
+                    os.makedirs(unzipdir_reprojected)
+                options = ['/usr/bin/gdalwarp',
+                           '-overwrite',
+                           '-t_srs', 'epsg:3035',
+                           rfpath,
+                           rfpath_reprojected
+                           ]
 
-        if vect:
-            options = ['/usr/bin/ogr2ogr',
-                       '-overwrite',
-                       '-t_srs', 'epsg:3035',
-                       unzipdir_reprojected,
-                       unzipdir
-                       ]
-        else:
-            rfpath = glob.glob("{}/*.tif".format(unzipdir))[0]
-            # rfpath = '{}/{}.tif'.format(unzipdir, name)
-            rfpath_reprojected = '{}/{}.tif'.format(unzipdir_reprojected, name)
-            if not os.path.exists(unzipdir_reprojected):
-                os.makedirs(unzipdir_reprojected)
-            options = ['/usr/bin/gdalwarp',
-                       '-overwrite',
-                       '-t_srs', 'epsg:3035',
-                       rfpath,
-                       rfpath_reprojected
-                       ]
-
-        subprocess.check_call(options, stderr=subprocess.STDOUT)
+            subprocess.check_call(options, stderr=subprocess.STDOUT)
 
     def get_remote(self, name, resolution, grid=None, column=None, query=None,
                    transform='scale', fillvalue=0, merge_alg=MergeAlg.replace,

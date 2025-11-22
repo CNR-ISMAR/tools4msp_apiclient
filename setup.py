@@ -28,6 +28,7 @@ setup(
                       'coreapi',
                       'numpy',
                       'xarray',
-                      'beautifulsoup4'
+                      'beautifulsoup4',
+                      'OWSlib',
                       ],
 )

@@ -1,0 +1,30 @@
+[project]
+name = "tools4msp_apiclient"
+version = "0.2.1"
+description = "Tools 4 MSP CaseStudy utilities"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "beautifulsoup4>=4.13.3",
+    "coreapi>=2.3.3",
+    "matplotlib>=3.7.5",
+    "numpy>=1.24.4",
+    "owslib>=0.31.0",
+    "rectifiedgrid>=1.2.0",
+    "setuptools<81",  # required by coreapi
+    "xarray>=2023.1.0",
+]
+authors = [{ name = "Stefano Menegon", email = "stefano.menegon@cnr.it" }]
+license = { text = "GPLv3" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+]
+
+[project.urls]
+Repository = "https://github.com/CNR-ISMAR/tools4msp_apiclient"
+
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
